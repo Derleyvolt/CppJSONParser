@@ -2,38 +2,38 @@
 #include <vector>
 #include <map>
 #include <string.h>
+#include <algorithm>
+#include <stack>
 
 using namespace std;
 
-struct CJSON;
+struct Node;
 
-struct JSONList {
-    vector<CJSON*> list;
+struct List {
+    vector<Node*> list;
 };
 
-struct CJSON {
-    enum Type { JSON, JSONLIST, STR, BOOLEAN, REAL };
+struct Object {
+    map<string, Node*> t;
+};
+
+struct Node {
+    enum Type { OBJECT, JSONLIST, STR, BOOLEAN, REAL };
 
     union {
-        CJSON*    json;
-        JSONList* jsonList;
-        string*   str;
-        bool      boolean;
-        float     real;
+        Object*    json;
+        List*      jsonList;
+        string*    str;
+        bool       boolean;
+        float      real;
     } data;
 
     Type type;
 };
 
-union Teste {
-    int32_t a;
-    int16_t b[2];
-    uint8_t c;
-};
-
 // 3F3F3F3F
 
-map<string, CJSON*> JSON;
+map<string, Node*> JSON;
 
 void printBits(uint32_t n, int countBits) {
     if(countBits <= 0) {
@@ -44,21 +44,116 @@ void printBits(uint32_t n, int countBits) {
     printf("%d", (n&1));
 }
 
-int main() {
-    Teste t;
+enum ValueType {
+    OBJECT,
+    LIST,
+    STRING,
+    LITERAL
+};
 
-    //t.a    = 0x3F4F5F6F; // Little Indian
-    //int x = 0xFFFFFFFF;
-    // memcpy(&t, &x, 4);
-
-    t.b[0] = 0xFFFF;
-    t.b[1] = 0xFFFF;
-
-    printBits(*(int32_t*)&t, 32);
-
-    printf("\n");
-
-    // cout << hex << t.a << endl;
-    cout << hex << t.a << endl;
-    return 0;
+string getKeyFromJSON(string& JSON) {
+    
 }
+
+string getValueFromJSON(string& JSON) {
+    stack<char> aux;
+    string value;
+
+    // skip vírgula e blank spaces
+    for(int i = 0; i < JSON.size(); i++) {
+        if(JSON[i] != ',' && JSON[i] != ' ') {
+            JSON = JSON.substr(i);
+            break;
+        }
+    }
+
+    char search = JSON.front();
+    value.push_back(search);
+
+    map<char, char> mapper;
+
+    mapper['['] = ']';
+    mapper['{'] = '}';
+    mapper['"'] = '"';
+
+    if(search == '[' || search == '{' || search == '"') {
+        aux.push(search);
+
+        for(int i = 1; i < JSON.size(); i++) {
+            char e = JSON[i];
+            if(mapper[search] == e) {
+                aux.pop();
+                if(aux.empty()) {
+                    value.push_back(e);
+                    JSON = JSON.substr(i+1);
+                    return value;
+                }
+            }
+
+            value.push_back(e);
+
+            if(e == search) {
+                aux.push(search);
+            }
+        }
+    } else {
+        int i;
+        // Nessa branch temos um Number ou um Literal
+        for(i = 1; i < JSON.size(); i++) {
+            char e = JSON[i];
+            if(e != '[' && e != '{' && e != ',') {
+                value.push_back(e);
+            } else {
+                JSON = JSON.substr(i+!!(e == ','));
+                return value;
+            }
+        }
+
+        // se chego aqui significa que a string acabou
+        JSON.clear();
+        return value;
+    }
+}
+
+// array<string, 2> split(string& JSON, int index) {
+//     string key, value;
+//     key   = JSON.substr(0, index);
+//     value = JSON.substr(index+1, JSON.);
+// }   
+
+// map<string, JSON*> parserKeyValue(string& JSON) {
+//     map<string, string> aux;
+
+//     JSON = string(JSON.begin()+1, JSON.end()-1);
+
+//     // while(1) {
+//     //     string key = JSON.substr(0, JSON.find())
+//     // }
+// }
+
+int main() {
+    string s = "\"Age\",{\"Lista\":[1,2,3,4,5]},1,2,3,\"rato\"";
+
+    while(s.size() > 0) {
+        cout << getValueFromJSON(s) << endl;
+    }
+
+}
+
+// {
+//     "Name": "Jonh",
+//     "Age": 34,
+//     "StateOfOrigin": "England",
+//     "Pets": [
+//         {
+//             "Type": "Cat",
+//             "Name": "MooMoo",
+//             "Age": 3.4
+//         }, 
+//         {
+//             "Type": "Squirrel",
+//             "Name": "Sandy",
+//             "Age": 7
+//         }
+//     ]
+// }

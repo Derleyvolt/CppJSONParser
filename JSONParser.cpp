@@ -2,70 +2,145 @@
 #include <vector>
 #include <map>
 #include <string.h>
+#include <string>
 #include <algorithm>
 #include <stack>
+#include <fstream>
+
+// JSON RFC --> https://www.rfc-editor.org/rfc/rfc8259
+// O coração do conversor é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
 
 using namespace std;
 
 struct Node;
+void   parserObject(string& JSON, map<string, Node*>& object);
+void   parserList(string& JSON, vector<Node*>& list);
 
 struct List {
     vector<Node*> list;
 };
 
 struct Object {
-    map<string, Node*> t;
+    map<string, Node*> object;
 };
-
-struct Node {
-    enum Type { OBJECT, JSONLIST, STR, BOOLEAN, REAL };
-
-    union {
-        Object*    json;
-        List*      jsonList;
-        string*    str;
-        bool       boolean;
-        float      real;
-    } data;
-
-    Type type;
-};
-
-// 3F3F3F3F
-
-map<string, Node*> JSON;
-
-void printBits(uint32_t n, int countBits) {
-    if(countBits <= 0) {
-        return;
-    }
-
-    printBits(n>>1, countBits-1);
-    printf("%d", (n&1));
-}
 
 enum ValueType {
     OBJECT,
     LIST,
     STRING,
-    LITERAL
+    NUMBER,
+    BOOLEAN,
+    NUL
 };
 
-string getKeyFromJSON(string& JSON) {
-    
+struct Node {
+    union {
+        Object*    object;
+        List*      list;
+        string*    str;
+        bool       boolean;
+        float      number;
+    } data;
+
+    ValueType type;
+};
+
+// partido da assumição de que o JSON é sempre válido
+ValueType getTypeFromJSON(string& JSON) {
+    if(JSON.front() == '[') {
+        return ValueType::LIST;
+    } 
+
+    if(JSON.front() == '{') {
+        return ValueType::OBJECT;
+    } 
+
+    if(JSON.front() == '"') {
+        return ValueType::STRING;
+    } 
+
+    if(JSON == "false" || JSON == "true") {
+        return ValueType::BOOLEAN;
+    } 
+
+    if(JSON == "null") {
+        return ValueType::NUL;
+    }
+
+    return ValueType::NUMBER;
 }
 
+Node* parseJSON(string& JSON) {
+    Node* node = new Node();
+
+    if(getTypeFromJSON(JSON) == ValueType::OBJECT) {
+        node->data.object = new Object();
+        node->type        = ValueType::OBJECT;
+        parserObject(JSON, node->data.object->object);
+        return node;
+    } 
+
+    if(getTypeFromJSON(JSON) == ValueType::LIST) {
+        node->data.list = new List();
+        parserList(JSON, node->data.list->list);
+        return node;
+    }
+
+    if(getTypeFromJSON(JSON) == ValueType::STRING) {
+        node->data.str = new string(JSON.substr(1, JSON.size()-2));
+        node->type     = ValueType::STRING;
+        return node;
+    } 
+
+    if(getTypeFromJSON(JSON) == ValueType::NUMBER) {
+        node->data.number = std::stof(JSON);
+        node->type        = ValueType::NUMBER;
+        return node;
+    }
+
+    if(getTypeFromJSON(JSON) == ValueType::BOOLEAN) {
+        node->data.boolean = JSON == "false" ? 0 : 1;
+        node->type         = ValueType::BOOLEAN;
+        return node;
+    }
+
+    node->type = ValueType::NUL;
+    return node;
+}
+
+// https://www.rfc-editor.org/rfc/rfc8259#page-5
+// JSON Lista de simbolos que podem ser ignorados
+bool skipSymbols(char c) {
+    return c == ',' ? 1 : c == ' ' ? 1 : c == ':' ? 1 : c == 0xA ? 1 : c == 0x9 ? 1 : c == 0xD ? 1 : 0;
+}
+
+void erasePrefixSeparators(string& JSON) {
+    for(int i = 0; i < JSON.size(); i++) {
+        if(!skipSymbols(JSON[i])) {
+            JSON = JSON.substr(i);
+            return;
+        }
+    }
+
+    JSON.clear();
+}   
+
+// espera apenas espaços
+string getKeyFromJSON(string& JSON) {
+    erasePrefixSeparators(JSON);
+
+    string value = JSON.substr(1, JSON.find(':')-2);
+    JSON         = JSON.substr(JSON.find(':')+1);
+    return value;
+}
+
+// espera apenas espaços ou vírgulas precedendo o value
 string getValueFromJSON(string& JSON) {
     stack<char> aux;
     string value;
 
     // skip vírgula e blank spaces
-    for(int i = 0; i < JSON.size(); i++) {
-        if(JSON[i] != ',' && JSON[i] != ' ') {
-            JSON = JSON.substr(i);
-            break;
-        }
-    }
+    erasePrefixSeparators(JSON);
 
     char search = JSON.front();
     value.push_back(search);
@@ -76,13 +151,19 @@ string getValueFromJSON(string& JSON) {
     mapper['{'] = '}';
     mapper['"'] = '"';
 
+    // Essa branch trata os casos onde temos uma lista, um objeto ou uma string
+
+    // A ideia é só generalizar o problema do 'valid parentheses problem'.
     if(search == '[' || search == '{' || search == '"') {
         aux.push(search);
 
         for(int i = 1; i < JSON.size(); i++) {
             char e = JSON[i];
+            // se eu encontro um simbolo que case com o topo da stack
+            // eu tiro o par da stack (sempre terá um par na stack visto que o JSON recebido é sempre válido [O front-end me garante que é válido]).
             if(mapper[search] == e) {
                 aux.pop();
+                // se a stack estiver vazio significa que chegamos no fim da lista/objeto/string
                 if(aux.empty()) {
                     value.push_back(e);
                     JSON = JSON.substr(i+1);
@@ -96,6 +177,8 @@ string getValueFromJSON(string& JSON) {
                 aux.push(search);
             }
         }
+
+        return "";
     } else {
         int i;
         // Nessa branch temos um Number ou um Literal
@@ -115,45 +198,48 @@ string getValueFromJSON(string& JSON) {
     }
 }
 
-// array<string, 2> split(string& JSON, int index) {
-//     string key, value;
-//     key   = JSON.substr(0, index);
-//     value = JSON.substr(index+1, JSON.);
-// }   
+void parserObject(string& JSON, map<string, Node*>& object) {
+    int JSONLen = JSON.size();
 
-// map<string, JSON*> parserKeyValue(string& JSON) {
-//     map<string, string> aux;
+    // apaga as chaves do objeto
+    JSON = JSON.substr(1, JSONLen-2);
 
-//     JSON = string(JSON.begin()+1, JSON.end()-1);
-
-//     // while(1) {
-//     //     string key = JSON.substr(0, JSON.find())
-//     // }
-// }
-
-int main() {
-    string s = "\"Age\",{\"Lista\":[1,2,3,4,5]},1,2,3,\"rato\"";
-
-    while(s.size() > 0) {
-        cout << getValueFromJSON(s) << endl;
+    while(!JSON.empty()) {
+        string key   = getKeyFromJSON(JSON);
+        string value = getValueFromJSON(JSON);
+        object[key]  = parseJSON(value);
+        erasePrefixSeparators(JSON);
     }
-
 }
 
-// {
-//     "Name": "Jonh",
-//     "Age": 34,
-//     "StateOfOrigin": "England",
-//     "Pets": [
-//         {
-//             "Type": "Cat",
-//             "Name": "MooMoo",
-//             "Age": 3.4
-//         }, 
-//         {
-//             "Type": "Squirrel",
-//             "Name": "Sandy",
-//             "Age": 7
-//         }
-//     ]
-// }
+void parserList(string& JSON, vector<Node*>& list) {
+    int JSONLen = JSON.size();
+
+    JSON = JSON.substr(1, JSONLen-2);
+
+    while(!JSON.empty()) {
+        string value = getValueFromJSON(JSON);
+        list.push_back(parseJSON(value));
+        erasePrefixSeparators(JSON);
+    }
+}
+
+string loadJSON() {
+    fstream fs("in", std::ifstream::in);
+    string temp, s;
+
+    while(!fs.eof()) {
+        getline(fs, temp);
+        s.append(temp);
+    }
+
+    return s;
+}
+
+int main() {
+    string s   = loadJSON();
+    Node* node = parseJSON(s);
+
+    cout << (int)node->data.number << endl;
+    return 0;
+}

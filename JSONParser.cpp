@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <stack>
 #include <fstream>
+#include <deque>
 
 // JSON RFC --> https://www.rfc-editor.org/rfc/rfc8259
 // O coração do conversor é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
@@ -46,12 +47,27 @@ public:
     }
 
     template<class T> 
-    T getValue(vector<string> index, Node* node = node) {
+    T getValue(deque<string> indexes, Node* node = node) {
         if(!index.empty()) {
             string key = index.front();
-            
-            if() {
 
+            if(node->type == ValueType::OBJECT) {
+                node = node->data.object->object[index.front()];
+                indexes.pop_front();
+                return <T>getValue(index, node);
+            } else if(node->type == ValueType::LIST) {
+                int index = stoi(indexes.front());
+                node = node->data.list->list[index];
+                indexes.pop_front();
+                return <T>getValue(indexes, node);
+            } else if(node->type == ValueType::NUMBER) {
+                return node->data.number;
+            } else if(node->type == ValueType::BOOLEAN) {   
+                return node->data.boolean;
+            } else if(node->type == ValueType::STRING) {
+                return *node->data.str;
+            } else {
+                return null;
             }
         }
     }
@@ -264,9 +280,14 @@ string loadJSON() {
 
 int main() {
     string s   = loadJSON();
-    Node* node = parseJSON(s);
+    // Node* node = parseJSON(s);
 
-    cout << (int)node->data.number << endl;
+    TreeJSON JSON(parseJSON(s));
+
+    // cout << (int)node->data.number << endl;
+
+    cout << <string>JSON.getValue() << endl;
+
     // cout << node->data.object->object["Pets"]->data.list->list[0]->data.object->object["Age"]->data.number << endl;
     return 0;
 }

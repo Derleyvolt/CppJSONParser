@@ -33,6 +33,30 @@ enum ValueType {
     NUL
 };
 
+class TreeJSON {
+private:
+    Node* node;
+public:
+    TreeJSON(Node* node) : node(node) {
+
+    }
+
+    void setNode(Node* node) {
+        this->node = node;
+    }
+
+    template<class T> 
+    T getValue(vector<string> index, Node* node = node) {
+        if(!index.empty()) {
+            string key = index.front();
+            
+            if() {
+
+            }
+        }
+    }
+};
+
 struct Node {
     union {
         Object*    object;
@@ -43,6 +67,8 @@ struct Node {
     } data;
 
     ValueType type;
+
+
 };
 
 // partido da assumição de que o JSON é sempre válido
@@ -241,5 +267,6 @@ int main() {
     Node* node = parseJSON(s);
 
     cout << (int)node->data.number << endl;
+    // cout << node->data.object->object["Pets"]->data.list->list[0]->data.object->object["Age"]->data.number << endl;
     return 0;
 }

@@ -7,23 +7,12 @@
 #include <stack>
 #include <fstream>
 #include <deque>
+#include <memory>
 
 // JSON RFC --> https://www.rfc-editor.org/rfc/rfc8259
 // O coração do conversor é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
 
 using namespace std;
-
-struct Node;
-void   parserObject(string& JSON, map<string, Node*>& object);
-void   parserList(string& JSON, vector<Node*>& list);
-
-struct List {
-    vector<Node*> list;
-};
-
-struct Object {
-    map<string, Node*> object;
-};
 
 enum ValueType {
     OBJECT,
@@ -34,57 +23,80 @@ enum ValueType {
     NUL
 };
 
-class TreeJSON {
-private:
-    Node* node;
-public:
-    TreeJSON(Node* node) : node(node) {
+struct Node {
+    void* ptr;
 
+    template<typename T>
+    T& get() {
+        return *(T*)ptr;
     }
 
-    void setNode(Node* node) {
-        this->node = node;
-    }
+    ValueType type;
+};
 
-    template<class T> 
-    T getValue(deque<string> indexes, Node* node = node) {
-        if(!index.empty()) {
-            string key = index.front();
+void   parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
+void   parserList(string& JSON, vector<shared_ptr<Node>>& list);
 
-            if(node->type == ValueType::OBJECT) {
-                node = node->data.object->object[index.front()];
-                indexes.pop_front();
-                return <T>getValue(index, node);
-            } else if(node->type == ValueType::LIST) {
-                int index = stoi(indexes.front());
-                node = node->data.list->list[index];
-                indexes.pop_front();
-                return <T>getValue(indexes, node);
-            } else if(node->type == ValueType::NUMBER) {
-                return node->data.number;
-            } else if(node->type == ValueType::BOOLEAN) {   
-                return node->data.boolean;
-            } else if(node->type == ValueType::STRING) {
-                return *node->data.str;
-            } else {
-                return null;
-            }
-        }
+struct List {
+    vector<shared_ptr<Node>> list;
+
+    Node* operator[](int32_t index) {
+        return list[index].get();
     }
 };
 
-struct Node {
-    union {
-        Object*    object;
-        List*      list;
-        string*    str;
-        bool       boolean;
-        float      number;
-    } data;
+struct Object {
+    map<string, shared_ptr<Node>> object;
 
-    ValueType type;
+    Node* operator[](string index) {
+        return this->object[index].get();
+    }
+};
 
+class Index {
+public:
+    Index(int index) {
+        this->index = index;
+    }
 
+    Index(const char* index) {
+        this->index = stoi(index);
+    }
+    
+    string operator()() {
+        return to_string(this->index);
+    }
+
+    uint32_t index;
+};
+
+class TreeJSON {
+public:
+    Node* xxx;
+
+    TreeJSON(Node* node) : xxx(node) {
+    }
+
+    template<class T>
+    T getValue(deque<Index> indexes, Node* node) {
+        if(!indexes.empty()) {
+            Index index = indexes.front();
+            indexes.pop_front();
+            
+            if(node->type == ValueType::OBJECT) {
+                return getValue<T>(indexes, node->get<Object>()[index()]);
+                // return getValue<T>(indexes, node->get<Object>()[index()]);
+            } else if(node->type == ValueType::LIST) {
+                return getValue<T>(indexes, node->get<List>()[stoi(index())]);
+            } else if(node->type == ValueType::STRING) {
+                return node->get<T>();
+            } else if(node->type == ValueType::NUMBER) {
+                return node->get<T>();
+            } else {
+                return nullptr;
+            }
+        }
+    }
 };
 
 // partido da assumição de que o JSON é sempre válido
@@ -112,37 +124,38 @@ ValueType getTypeFromJSON(string& JSON) {
     return ValueType::NUMBER;
 }
 
-Node* parseJSON(string& JSON) {
-    Node* node = new Node();
+shared_ptr<Node> parseJSON(string& JSON) {
+    shared_ptr<Node> node(new Node());
 
     if(getTypeFromJSON(JSON) == ValueType::OBJECT) {
-        node->data.object = new Object();
-        node->type        = ValueType::OBJECT;
-        parserObject(JSON, node->data.object->object);
+        node->ptr  = new Object();
+        node->type = ValueType::OBJECT;  
+        parserObject(JSON, node->get<Object>().object);
         return node;
     } 
 
     if(getTypeFromJSON(JSON) == ValueType::LIST) {
-        node->data.list = new List();
-        parserList(JSON, node->data.list->list);
+        node->ptr  = new List();
+        node->type = ValueType::LIST;
+        parserList(JSON, node->get<List>().list);
         return node;
     }
 
     if(getTypeFromJSON(JSON) == ValueType::STRING) {
-        node->data.str = new string(JSON.substr(1, JSON.size()-2));
-        node->type     = ValueType::STRING;
+        node->ptr  = new string(JSON.substr(1, JSON.size()-2));
+        node->type = ValueType::STRING;
         return node;
     } 
 
     if(getTypeFromJSON(JSON) == ValueType::NUMBER) {
-        node->data.number = std::stof(JSON);
-        node->type        = ValueType::NUMBER;
+        node->ptr  = new int(stof(JSON));
+        node->type = ValueType::NUMBER;
         return node;
     }
 
     if(getTypeFromJSON(JSON) == ValueType::BOOLEAN) {
-        node->data.boolean = JSON == "false" ? 0 : 1;
-        node->type         = ValueType::BOOLEAN;
+        node->ptr  = new bool(JSON == "false" ? 0 : 1);
+        node->type = ValueType::BOOLEAN;
         return node;
     }
 
@@ -240,7 +253,7 @@ string getValueFromJSON(string& JSON) {
     }
 }
 
-void parserObject(string& JSON, map<string, Node*>& object) {
+void parserObject(string& JSON, map<string, shared_ptr<Node>>& object) {
     int JSONLen = JSON.size();
 
     // apaga as chaves do objeto
@@ -254,7 +267,7 @@ void parserObject(string& JSON, map<string, Node*>& object) {
     }
 }
 
-void parserList(string& JSON, vector<Node*>& list) {
+void parserList(string& JSON, vector<shared_ptr<Node>>& list) {
     int JSONLen = JSON.size();
 
     JSON = JSON.substr(1, JSONLen-2);
@@ -279,14 +292,25 @@ string loadJSON() {
 }
 
 int main() {
-    string s   = loadJSON();
+    string s = loadJSON();
     // Node* node = parseJSON(s);
 
-    TreeJSON JSON(parseJSON(s));
+    shared_ptr<Node> node = parseJSON(s);
 
-    // cout << (int)node->data.number << endl;
+    TreeJSON JSON(node.get());
 
-    cout << <string>JSON.getValue() << endl;
+    // auto ptr  = node->get<Object>()["Pets"]->get<List>()[1]->get<Object>()["Type"]->get<string>();
+    
+
+    // cout << ptr << endl;
+
+    cout << JSON.getValue<string>({ "StateOfOrigin" }, node.get());
+
+    // cout << ptr->get<string>() << endl;
+
+    // List*   list =  (List*)obj->["Pets"]->ptr;
+    // Object* obj2  = (Object*)list->list[0].ptr;
+    // cout << *(string*)obj2->object["Type"].ptr << endl;
 
     // cout << node->data.object->object["Pets"]->data.list->list[0]->data.object->object["Age"]->data.number << endl;
     return 0;

@@ -18,8 +18,8 @@ enum ValueType {
     OBJECT,
     LIST,
     STRING,
-    NUMBER,
     BOOLEAN,
+    NUMBER,
     NUL
 };
 
@@ -56,48 +56,49 @@ struct Object {
 class Index {
 public:
     Index(int index) {
-        this->index = index;
+        this->index = to_string(index);
     }
 
     Index(const char* index) {
-        this->index = stoi(index);
+        this->index = index;
     }
     
     string operator()() {
-        return to_string(this->index);
+        return this->index;
     }
 
-    uint32_t index;
+    string index;
 };
 
-class TreeJSON {
-public:
-    Node* xxx;
-
-    TreeJSON(Node* node) : xxx(node) {
+string getValue(deque<Index> indexes, Node* node) {
+    if(!indexes.empty()) {
+        Index index = indexes.front();
+        indexes.pop_front();
+        
+        if(node->type == ValueType::OBJECT) {
+            return getValue(indexes, node->get<Object>()[index()]);
+        } else {
+            return getValue(indexes, node->get<List>()[stoi(index())]);
+        } 
     }
 
-    template<class T>
-    T getValue(deque<Index> indexes, Node* node) {
-        if(!indexes.empty()) {
-            Index index = indexes.front();
-            indexes.pop_front();
-            
-            if(node->type == ValueType::OBJECT) {
-                return getValue<T>(indexes, node->get<Object>()[index()]);
-                // return getValue<T>(indexes, node->get<Object>()[index()]);
-            } else if(node->type == ValueType::LIST) {
-                return getValue<T>(indexes, node->get<List>()[stoi(index())]);
-            } else if(node->type == ValueType::STRING) {
-                return node->get<T>();
-            } else if(node->type == ValueType::NUMBER) {
-                return node->get<T>();
-            } else {
-                return nullptr;
-            }
-        }
+    return node->get<string>();
+}
+
+Node* getNode(deque<Index> indexes, Node* node) {
+    if(!indexes.empty()) {
+        Index index = indexes.front();
+        indexes.pop_front();
+        
+        if(node->type == ValueType::OBJECT) {
+            return getNode(indexes, node->get<Object>()[index()]);
+        } else {
+            return getNode(indexes, node->get<List>()[stoi(index())]);
+        } 
     }
-};
+
+    return node;
+}
 
 // partido da assumição de que o JSON é sempre válido
 ValueType getTypeFromJSON(string& JSON) {
@@ -148,18 +149,20 @@ shared_ptr<Node> parseJSON(string& JSON) {
     } 
 
     if(getTypeFromJSON(JSON) == ValueType::NUMBER) {
-        node->ptr  = new int(stof(JSON));
+        node->ptr  = new string(JSON);
         node->type = ValueType::NUMBER;
         return node;
     }
 
     if(getTypeFromJSON(JSON) == ValueType::BOOLEAN) {
-        node->ptr  = new bool(JSON == "false" ? 0 : 1);
+        node->ptr  = new string(JSON);
         node->type = ValueType::BOOLEAN;
         return node;
     }
 
+    node->ptr  = new string(JSON);
     node->type = ValueType::NUL;
+
     return node;
 }
 
@@ -279,6 +282,7 @@ void parserList(string& JSON, vector<shared_ptr<Node>>& list) {
     }
 }
 
+// apenas pra debugar
 string loadJSON() {
     fstream fs("in", std::ifstream::in);
     string temp, s;
@@ -293,25 +297,11 @@ string loadJSON() {
 
 int main() {
     string s = loadJSON();
-    // Node* node = parseJSON(s);
 
     shared_ptr<Node> node = parseJSON(s);
 
-    TreeJSON JSON(node.get());
+    auto node1 = getNode({ "Pets", 2, 1, "Nome" }, node.get());
 
-    // auto ptr  = node->get<Object>()["Pets"]->get<List>()[1]->get<Object>()["Type"]->get<string>();
-    
-
-    // cout << ptr << endl;
-
-    cout << JSON.getValue<string>({ "StateOfOrigin" }, node.get());
-
-    // cout << ptr->get<string>() << endl;
-
-    // List*   list =  (List*)obj->["Pets"]->ptr;
-    // Object* obj2  = (Object*)list->list[0].ptr;
-    // cout << *(string*)obj2->object["Type"].ptr << endl;
-
-    // cout << node->data.object->object["Pets"]->data.list->list[0]->data.object->object["Age"]->data.number << endl;
+    cout << getValue({ }, node1) << endl;
     return 0;
 }

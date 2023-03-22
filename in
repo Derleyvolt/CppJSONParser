@@ -12,6 +12,10 @@
             "Type": "Squirrel",
             "Name": "Sandy",
             "Age": 7
-        }
+        },
+        ["1", {
+            "Nome": "Ratinho Azulado",
+            "Idade": 15
+        }, "3", "4"]
     ]
 }

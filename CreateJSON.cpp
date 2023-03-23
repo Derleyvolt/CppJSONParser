@@ -3,18 +3,10 @@
 #include <map>
 #include <memory>
 #include <deque>
+#include <array>
+#include <string>
 
 using namespace std;
-
-// void bswap(void* const ptr, int bcount) {
-//     uint8_t* bytes = new uint8_t[bcount];
-//     for(int i = 0; i < bcount; i++) {
-//         bytes[bcount-1-i] = *(uint8_t*)(ptr+i);
-//     }
-
-//     memcpy(ptr, bytes, bcount);
-//     delete [] bytes;
-// }
 
 enum ValueType {
     OBJECT,
@@ -35,41 +27,115 @@ struct Node {
 
     ValueType type;
 };
-class Object {
-    map<string, Node*> object;
-};
 
 class Index {
 public:
-    Index(int node) {
+	Index(bool arg) {
+		node       = shared_ptr<Node>(new Node());
+        node->ptr  = new string(arg ? "true" : "false");
+        node->type = ValueType::STRING;
+        listArgs.push_back(node);
+	}
 
-    }
-
-    Index(const char* index) {
-
+    // Essa versão do overload é também utilizada pra setar um índice que
+    // é usado na etapa de conversão JSON -> OBJECT
+    Index(const char* arg) {
+        this->index = arg;
+        node        = shared_ptr<Node>(new Node());
+        node->ptr   = new string(arg);
+        node->type  = ValueType::STRING;
+        listArgs.push_back(node);
     }
     
-    Index(Node* node) {
-
+    string operator()() {
+        return this->index;
     }
+
+    // Essa versão do overload é também utilizada pra setar um índice que
+    // é usado na etapa de conversão JSON -> OBJECT
+	Index(int32_t arg) {
+		this->index = to_string(arg);
+		node 	    = shared_ptr<Node>(new Node());
+		node->ptr   = new int(arg);
+		node->type  = ValueType::NUMBER;
+		listArgs.push_back(node);
+	}
+
+	Index(double arg) {
+		node       = shared_ptr<Node>(new Node());
+		node->ptr  = new double(arg);
+		node->type = ValueType::NUMBER;
+		listArgs.push_back(node);
+	}
+
+	Index(shared_ptr<Node> node) {
+		this->node = node;
+		listArgs.push_back(node);
+	}
+
+	Index operator, (Index rhs) {
+		listArgs.push_back(rhs.listArgs.front());
+		return *this;
+	}
+
+	vector<shared_ptr<Node>> getIndexes() const {
+		return this->listArgs;
+	}
+
+	shared_ptr<Node> getNode() const {
+		return this->node;
+	}
+
 private:
-    shared_ptr<Node> node;
+	string 			 		 index;
+	shared_ptr<Node> 		 node;
+	vector<shared_ptr<Node>> listArgs;
+};
+
+class KeyValue {
+public:
+    KeyValue(string key, Index value) : key(key), index(value) {       
+    }
+
+private:
+    string key;
+    Index index;
+};
+
+class Object {
+public:
+    map<string, Node*> object;
+
+	shared_ptr<Node> operator()(deque<KeyValue> pairs) {
+		return {};
+	}
 };
 
 // vector<Index> indexes;
 class List {
 public:
-    Node* operator[](deque<Index> index) {
-        return nullptr;
+    shared_ptr<Node> operator[](Index index) {
+        // Aqui a gente vai tirar em index.getIndexes();
     }
 };
 
-#define LIST List()
+#define LIST        List()
+#define OBJECT      Object()
+#define LITERAL(a)  Index(a)
+#define NUMBER(a)   Index(a)
+#define NUL         Index("null")
 
 int main() {
-    LIST[{"1", "2", "3"}]
-
-    // [ { {"Nome", 1547}, {"Age", "17"} }, ]
+	OBJECT({
+            { "Nome", "Derley"},
+            { "Idade", 26},
+            { "Elementos aleatorios", LIST[LITERAL(false), NUMBER(5), NUL, 
+            OBJECT({
+                {"Regiao", "Brasil"}
+            })]},
+            { "Ano", 2016 }
+        }
+    );
 
     return 0;
 }

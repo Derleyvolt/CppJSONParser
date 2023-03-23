@@ -167,17 +167,29 @@ string listStringify(shared_ptr<Node> node) {
 }
 
 string parseToJSON(shared_ptr<Node> node) {
-    string res;
-
-    if(node.get()->type == ValueType::OBJECT) {
+    if(node->type == ValueType::OBJECT) {
         return objectStrigify(node);
     }
 
-    if(node.get()->type == ValueType::LIST) {
+    if(node->type == ValueType::LIST) {
         return listStringify(node);
     }
 
-    
+    if(node->type == ValueType::STRING) {
+        return "\"" + node->get<string>() + "\"";
+    }
+
+    if(node->type == ValueType::NUMBER) {
+        return node->get<string>();
+    }
+
+    if(node->type == ValueType::BOOLEAN) {
+        return node->get<string>();
+    }
+
+    if(node->type == ValueType::NUL) {
+        return node->get<string>();
+    }
 }
 
 int main() {

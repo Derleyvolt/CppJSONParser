@@ -70,30 +70,30 @@ public:
     string index;
 };
 
-string getValue(deque<Index> indexes, Node* node) {
+string getValue(deque<Index> indexes, shared_ptr<Node> node) {
     if(!indexes.empty()) {
         Index index = indexes.front();
         indexes.pop_front();
         
         if(node->type == ValueType::OBJECT) {
-            return getValue(indexes, node->get<Object>()[index()]);
+            return getValue(indexes, shared_ptr<Node>(node->get<Object>()[index()]));
         } else {
-            return getValue(indexes, node->get<List>()[stoi(index())]);
+            return getValue(indexes, shared_ptr<Node>(node->get<List>()[stoi(index())]));
         } 
     }
 
     return node->get<string>();
 }
 
-Node* getNode(deque<Index> indexes, Node* node) {
+shared_ptr<Node> getNode(deque<Index> indexes, shared_ptr<Node> node) {
     if(!indexes.empty()) {
         Index index = indexes.front();
         indexes.pop_front();
-        
+
         if(node->type == ValueType::OBJECT) {
-            return getNode(indexes, node->get<Object>()[index()]);
+            return getNode(indexes, shared_ptr<Node>(node->get<Object>()[index()]));
         } else {
-            return getNode(indexes, node->get<List>()[stoi(index())]);
+            return getNode(indexes, shared_ptr<Node>(node->get<List>()[stoi(index())]));
         } 
     }
 
@@ -300,7 +300,7 @@ int main() {
 
     shared_ptr<Node> node = parseJSON(s);
 
-    auto node1 = getNode({ "Pets", 2, 1, "Nome" }, node.get());
+    auto node1 = getNode({ "Pets", 2, 1, "Nome" }, node);
 
     cout << getValue({ }, node1) << endl;
     return 0;

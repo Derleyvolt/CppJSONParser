@@ -34,8 +34,8 @@ struct Node {
     ValueType type;
 };
 
-void   parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
-void   parserList(string& JSON, vector<shared_ptr<Node>>& list);
+void parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
+void parserList(string& JSON, vector<shared_ptr<Node>>& list);
 
 struct List {
     vector<shared_ptr<Node>> list;
@@ -61,12 +61,16 @@ public:
 
     Index(const char* index) {
         this->index = index;
+        // adiciono um prefixo e sufixo \"
+        this->index.insert(this->index.begin(), '"');
+        this->index.push_back('"');
     }
     
     string operator()() {
         return this->index;
     }
 
+private:
     string index;
 };
 
@@ -265,7 +269,7 @@ void parserObject(string& JSON, map<string, shared_ptr<Node>>& object) {
     while(!JSON.empty()) {
         string key   = getKeyFromJSON(JSON);
         string value = getValueFromJSON(JSON);
-        object[key]  = parseJSON(value);
+        object["\"" + key + "\""]  = parseJSON(value);
         erasePrefixSeparators(JSON);
     }
 }

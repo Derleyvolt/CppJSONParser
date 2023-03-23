@@ -94,7 +94,8 @@ private:
 
 class KeyValue {
 public:
-    KeyValue(string key, Index value) : key(key), index(value) {       
+    KeyValue(string key, Index value) : key(key), index(value) {
+
     }
 
 private:
@@ -104,7 +105,7 @@ private:
 
 class Object {
 public:
-    map<string, Node*> object;
+    map<string, shared_ptr<Node>> obj;
 
 	shared_ptr<Node> operator()(deque<KeyValue> pairs) {
 		return {};
@@ -114,25 +115,79 @@ public:
 // vector<Index> indexes;
 class List {
 public:
+    vector<shared_ptr<Node>> array; 
+
     shared_ptr<Node> operator[](Index index) {
-        // Aqui a gente vai tirar em index.getIndexes();
+        
     }
 };
 
-#define LIST        List()
-#define OBJECT      Object()
-#define LITERAL(a)  Index(a)
-#define NUMBER(a)   Index(a)
-#define NUL         Index("null")
+#define list        List()
+#define object      Object()
+#define literal(a)  Index(a)
+#define number(a)   Index(a)
+#define null        Index("null")
+
+string objectStrigify(shared_ptr<Node> node) {
+    string res;
+    res.push_back('{');
+
+    auto map = node->get<Object>().obj;
+
+    for(auto [key, value] : map) {
+        res.append('"' + key + "\": ");
+        res.append(parseToJSON(value));
+        res.push_back(',');
+    }
+
+    if(res.back() == ',') {
+        res.pop_back();
+    }
+
+    return res + '}';
+}
+
+string listStringify(shared_ptr<Node> node) {
+    string res;
+
+    res.push_back('[');
+
+    auto arr = node->get<List>().array;
+
+    for(auto e : arr) {
+        res.append(parseToJSON(e));
+        res.push_back(',');
+    }
+
+    if(res.back() == ',') {
+        res.pop_back();
+    }
+
+    return res + ']';
+}
+
+string parseToJSON(shared_ptr<Node> node) {
+    string res;
+
+    if(node.get()->type == ValueType::OBJECT) {
+        return objectStrigify(node);
+    }
+
+    if(node.get()->type == ValueType::LIST) {
+        return listStringify(node);
+    }
+
+    
+}
 
 int main() {
-	OBJECT({
-            { "Nome", "Derley"},
-            { "Idade", 26},
-            { "Elementos aleatorios", LIST[LITERAL(false), NUMBER(5), NUL, 
-            OBJECT({
+	object({
+            { "Nome", "Derley" },
+            { "Idade", 26 },
+            { "Elementos aleatorios", list[literal(false), number(5), null, 
+            object({
                 {"Regiao", "Brasil"}
-            })]},
+            })] },
             { "Ano", 2016 }
         }
     );

@@ -5,6 +5,7 @@
 #include <deque>
 #include <array>
 #include <string>
+#include <fstream>
 
 using namespace std;
 
@@ -33,13 +34,14 @@ public:
 	Index(bool arg) {
 		node       = shared_ptr<Node>(new Node());
         node->ptr  = new string(arg ? "true" : "false");
-        node->type = ValueType::STRING;
+        node->type = ValueType::BOOLEAN;
         listArgs.push_back(node);
 	}
 
     // Essa versão do overload é também utilizada pra setar um índice que
     // é usado na etapa de conversão JSON -> OBJECT
     Index(const char* arg) {
+        cout << "teste" << endl;
         this->index = arg;
         node        = shared_ptr<Node>(new Node());
         node->ptr   = new string(arg);
@@ -53,17 +55,22 @@ public:
 
     // Essa versão do overload é também utilizada pra setar um índice que
     // é usado na etapa de conversão JSON -> OBJECT
-	Index(int32_t arg) {
+	Index(int32_t arg, int nullFlag = 0) {
 		this->index = to_string(arg);
 		node 	    = shared_ptr<Node>(new Node());
-		node->ptr   = new int(arg);
-		node->type  = ValueType::NUMBER;
+        if(nullFlag) {
+		    node->ptr   = new string("null");
+		    node->type  = ValueType::NUL;
+        } else {
+            node->ptr   = new string(to_string(arg));
+		    node->type  = ValueType::NUMBER;
+        }
 		listArgs.push_back(node);
 	}
 
 	Index(double arg) {
 		node       = shared_ptr<Node>(new Node());
-		node->ptr  = new double(arg);
+		node->ptr  = new string(to_string(arg));
 		node->type = ValueType::NUMBER;
 		listArgs.push_back(node);
 	}
@@ -74,6 +81,7 @@ public:
 	}
 
 	Index operator, (Index rhs) {
+        cout << "teste" << endl;
 		listArgs.push_back(rhs.listArgs.front());
 		return *this;
 	}
@@ -98,6 +106,14 @@ public:
 
     }
 
+    string getKey() const {
+        return key;
+    }
+
+    Index getVal() const {
+        return index;
+    }
+
 private:
     string key;
     Index index;
@@ -108,7 +124,19 @@ public:
     map<string, shared_ptr<Node>> obj;
 
 	shared_ptr<Node> operator()(deque<KeyValue> pairs) {
-		return {};
+        shared_ptr<Node> node(new Node());
+
+        node->type = ValueType::OBJECT;
+
+        node->ptr = new Object();
+
+        for(auto e : pairs) {
+            string key      = e.getKey();
+            auto   auxNode  = e.getVal().getNode();
+            node->get<Object>().obj[key] = auxNode;
+        }
+
+        return node;
 	}
 };
 
@@ -118,7 +146,12 @@ public:
     vector<shared_ptr<Node>> array; 
 
     shared_ptr<Node> operator[](Index index) {
-        
+        shared_ptr<Node> node(new Node());
+        node->ptr  = new List();
+        node->type = ValueType::LIST;
+        node->get<List>().array = index.getIndexes();
+
+        return node;
     }
 };
 
@@ -126,7 +159,9 @@ public:
 #define object      Object()
 #define literal(a)  Index(a)
 #define number(a)   Index(a)
-#define null        Index("null")
+#define null        Index(0, 1)
+
+string parseToJSON(shared_ptr<Node> node);
 
 string objectStrigify(shared_ptr<Node> node) {
     string res;
@@ -190,19 +225,32 @@ string parseToJSON(shared_ptr<Node> node) {
     if(node->type == ValueType::NUL) {
         return node->get<string>();
     }
+
+    return "";
+}
+
+void saveJSON(string JSON) {
+    fstream fs("out", std::ifstream::out);
+    string temp, s;
+
+    fs << JSON;
+
+    fs.close();
 }
 
 int main() {
-	object({
-            { "Nome", "Derley" },
-            { "Idade", 26 },
-            { "Elementos aleatorios", list[literal(false), number(5), null, 
-            object({
-                {"Regiao", "Brasil"}
-            })] },
-            { "Ano", 2016 }
-        }
-    );
+	// auto node = object( { {"Nome", "Jonh" }, { "Age", 34 }, { "StateOfOrigin", "England" },
+    // {"Pets", list[object({ {"Type", "Cat"}, {"Name", "MooMoo"}, {"Age", number(3.4)}  }), 
+    //               object({ {"Type", "Squirrel"}, {"Name", "Sandy"}, {"Age", number(7)}  }),
+    //               list["1", object({ {"Nome", "Ratinho Azulado"}, {"Idade", 15}  })]]}
+    // } );
 
+    auto node = list["1", "2", "3"];
+
+    string s = parseToJSON(node);
+
+    cout << s << endl;
+
+    saveJSON(s);
     return 0;
 }

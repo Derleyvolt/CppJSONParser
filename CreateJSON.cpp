@@ -228,12 +228,20 @@ void saveJSON(string JSON) {
     fs.close();
 }
 
+class User {
+public:
+    User(string name, int age, float money, bool male ) {
+
+    }
+
+    string name;
+    int age;
+    float money;
+    bool male;
+};
+
 int main() {
-	auto node = object( { {"Nome", "Jonh" }, { "Age", 34 }, { "StateOfOrigin", "England" },
-    {"Pets", list[{object({ {"Type", "Cat"}, {"Name", "MooMoo"}, {"Age", number(3.4)}  }), 
-                  object({ {"Type", "Squirrel"}, {"Name", "Sandy"}, {"Age", number(7)}  }),
-                  list[{"1", object({ {"Nome", "Ratinho Azulado"}, {"Idade", 15}  }), "3", "4"}]}]}
-    } );
+	auto node = object({ {"name", "Derley"}, { "Algo", object({}) }});
 
     string s = parseToJSON(node);
 

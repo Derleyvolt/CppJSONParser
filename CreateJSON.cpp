@@ -35,7 +35,6 @@ public:
 		node       = shared_ptr<Node>(new Node());
         node->ptr  = new string(arg ? "true" : "false");
         node->type = ValueType::BOOLEAN;
-        listArgs.push_back(node);
 	}
 
     // Essa versão do overload é também utilizada pra setar um índice que
@@ -46,7 +45,6 @@ public:
         node        = shared_ptr<Node>(new Node());
         node->ptr   = new string(arg);
         node->type  = ValueType::STRING;
-        listArgs.push_back(node);
     }
     
     string operator()() {
@@ -65,29 +63,21 @@ public:
             node->ptr   = new string(to_string(arg));
 		    node->type  = ValueType::NUMBER;
         }
-		listArgs.push_back(node);
 	}
 
 	Index(double arg) {
 		node       = shared_ptr<Node>(new Node());
 		node->ptr  = new string(to_string(arg));
 		node->type = ValueType::NUMBER;
-		listArgs.push_back(node);
 	}
 
 	Index(shared_ptr<Node> node) {
 		this->node = node;
-		listArgs.push_back(node);
 	}
 
 	Index operator, (Index rhs) {
         cout << "teste" << endl;
-		listArgs.push_back(rhs.listArgs.front());
 		return *this;
-	}
-
-	vector<shared_ptr<Node>> getIndexes() const {
-		return this->listArgs;
 	}
 
 	shared_ptr<Node> getNode() const {
@@ -97,7 +87,6 @@ public:
 private:
 	string 			 		 index;
 	shared_ptr<Node> 		 node;
-	vector<shared_ptr<Node>> listArgs;
 };
 
 class KeyValue {
@@ -145,12 +134,13 @@ class List {
 public:
     vector<shared_ptr<Node>> array; 
 
-    shared_ptr<Node> operator[](Index index) {
+    shared_ptr<Node> operator[](deque<Index> Index) {
         shared_ptr<Node> node(new Node());
         node->ptr  = new List();
         node->type = ValueType::LIST;
-        node->get<List>().array = index.getIndexes();
-
+        for(auto e : Index) {
+            node->get<List>().array.push_back(e.getNode());
+        }
         return node;
     }
 };
@@ -169,9 +159,9 @@ string objectStrigify(shared_ptr<Node> node) {
 
     auto map = node->get<Object>().obj;
 
-    for(auto [key, value] : map) {
-        res.append('"' + key + "\": ");
-        res.append(parseToJSON(value));
+    for(auto e : map) {
+        res.append('"' + e.first + "\": ");
+        res.append(parseToJSON(e.second));
         res.push_back(',');
     }
 
@@ -239,13 +229,11 @@ void saveJSON(string JSON) {
 }
 
 int main() {
-	// auto node = object( { {"Nome", "Jonh" }, { "Age", 34 }, { "StateOfOrigin", "England" },
-    // {"Pets", list[object({ {"Type", "Cat"}, {"Name", "MooMoo"}, {"Age", number(3.4)}  }), 
-    //               object({ {"Type", "Squirrel"}, {"Name", "Sandy"}, {"Age", number(7)}  }),
-    //               list["1", object({ {"Nome", "Ratinho Azulado"}, {"Idade", 15}  })]]}
-    // } );
-
-    auto node = list["1", "2", "3"];
+	auto node = object( { {"Nome", "Jonh" }, { "Age", 34 }, { "StateOfOrigin", "England" },
+    {"Pets", list[{object({ {"Type", "Cat"}, {"Name", "MooMoo"}, {"Age", number(3.4)}  }), 
+                  object({ {"Type", "Squirrel"}, {"Name", "Sandy"}, {"Age", number(7)}  }),
+                  list[{"1", object({ {"Nome", "Ratinho Azulado"}, {"Idade", 15}  }), "3", "4"}]}]}
+    } );
 
     string s = parseToJSON(node);
 

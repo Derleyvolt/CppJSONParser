@@ -24,12 +24,14 @@ enum ValueType {
 };
 
 struct Node {
-    void* ptr;
+    void* ptr = nullptr;
 
     template<typename T>
     T& get() {
         return *(T*)ptr;
     }
+
+    ~Node();
 
     ValueType type;
 };
@@ -158,6 +160,19 @@ public:
 	}
 };
 
+// evitando memory leak
+Node::~Node() {
+    if(ptr != nullptr) {
+        if(type == ValueType::OBJECT) {
+            delete (Object*)ptr;
+        } else if(type == ValueType::LIST) {
+            delete (List*)ptr;
+        } else {
+            delete (string*)ptr;
+        }
+    }
+}
+
 class pathJSON {
 private:
 	class pathIndex {
@@ -193,24 +208,26 @@ public:
 	}
 };
 
-string getValue(pathJSON path, shared_ptr<Node> node) {
+string getValue(pathJSON path, Node* node) {
     if(!path.isEmpty()) {  
         if(node->type == ValueType::OBJECT) {
-            return getValue(path, shared_ptr<Node>(node->get<Object>()[path.getIndex()]));
+            return getValue(path, node->get<Object>()[path.getIndex()]);
         } else {
-            return getValue(path, shared_ptr<Node>(node->get<List>()[stoi(path.getIndex())]));
+            return getValue(path, node->get<List>()[stoi(path.getIndex())]);
         } 
     }
 
     return node->get<string>();
 }
 
-shared_ptr<Node> getNode(pathJSON path, shared_ptr<Node> node) {
+// Way Down We Go.
+
+Node* getNode(pathJSON path, Node* node) {
     if(!path.isEmpty()) {
         if(node->type == ValueType::OBJECT) {
-            return getNode(path, shared_ptr<Node>(node->get<Object>()[path.getIndex()]));
+            return getNode(path, node->get<Object>()[path.getIndex()]);
         } else {
-            return getNode(path, shared_ptr<Node>(node->get<List>()[stoi(path.getIndex())]));
+            return getNode(path, node->get<List>()[stoi(path.getIndex())]);
         } 
     }
 
@@ -475,20 +492,5 @@ string JSONStringify(shared_ptr<Node> node) {
 }
 
 int main() {
-    // string s = loadJSON();
-
-    // shared_ptr<Node> node = JSONParse(s);
-
-    // auto node1 = getNode(path({"Age"}), node);
-
-    // cout << getValue(path({}), node1) << endl;
-
-    auto node = object({ {"name", "Derley"}, { "Algo", object({}) }});
-
-    string s = JSONStringify(node);
-
-    cout << s << endl;
-
-    //cout << JSONStringify(node) << endl;
     return 0;
 }

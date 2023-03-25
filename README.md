@@ -1,7 +1,7 @@
 # CppJSONParser
 
 
-### Exemplo 1, JSON para C++
+### Exemplo 1: JSON para C++
 
 ```cpp
 int main() {
@@ -26,7 +26,7 @@ int main() {
 
 > Saída: Sandy
 
-### Exemplo 2, JSON para C++
+### Exemplo 2: JSON para C++
 
 ```cpp
 int main() {
@@ -49,5 +49,61 @@ int main() {
 
 > Saída: Sandy
 
-### Exemplo 3, C++ para JSON
+### Exemplo 3: C++ para JSON
 
+```cpp
+int main() {
+    auto node = object({ {"Nome", "Derley"}, 
+                         {"Moedas", list[{number(1), number(2), number(5)}]}, 
+                         {"Informacao", object({ {"Profissao", "Programador"}, 
+                                                  {"Idade", 26}, 
+                                                  {"Sexo", "Masculino"} })
+                        }});
+
+    string JSON = JSONStringify(node);
+    cout << JSON << endl;
+    return 0;
+}
+```
+> Saída crua: {"Informacao": {"Idade": 26,"Profissao": "Programador","Sexo": "Masculino"},"Moedas": [1,2,5],"Nome": "Derley"}
+
+> Saída formatada
+
+```js
+{  
+    "Informacao": {  
+                 "Idade": 26,
+                 "Profissao": "Programador",
+                 "Sexo": "Masculino"
+    },
+    "Moedas": [1,2,5],
+    "Nome": "Derley"
+}
+```
+
+### Exemplo 4: C++ para JSON 
+
+```cpp
+int main() {
+    auto node = object({ {"Tipo", "Cachorro"}, {"Nome", "Pluto"}, {"Vegetariano", literal(false)},
+                         { "Dias da Semana", list[{ "Segunda", "Terca", "Quarta", "Quinta", "Sexta", 
+                                                    "Sabado", "Domingo", null }] 
+                         }});
+
+    string JSON = JSONStringify(node);
+    cout << JSON << endl;
+    return 0;
+}
+```
+
+> Saída crua: {"Dias da Semana": ["Segunda","Terca","Quarta","Quinta","Sexta","Sabado","Domingo",null],"Nome": "Pluto","Tipo": "Cachorro","Vegetariano": false}
+
+> Saída formatada
+```js
+{
+    "Dias da Semana": ["Segunda","Terca","Quarta","Quinta","Sexta","Sabado","Domingo",null],
+    "Nome": "Pluto",
+    "Tipo": "Cachorro",
+    "Vegetariano": false
+}
+```

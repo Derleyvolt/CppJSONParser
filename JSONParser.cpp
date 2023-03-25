@@ -34,70 +34,183 @@ struct Node {
     ValueType type;
 };
 
-void parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
-void parserList(string& JSON, vector<shared_ptr<Node>>& list);
-
-struct List {
-    vector<shared_ptr<Node>> list;
-
-    Node* operator[](int32_t index) {
-        return list[index].get();
-    }
-};
-
-struct Object {
-    map<string, shared_ptr<Node>> object;
-
-    Node* operator[](string index) {
-        return this->object[index].get();
-    }
-};
-
 class Index {
 public:
-    Index(int index) {
-        this->index = to_string(index);
-    }
+	Index(bool arg) {
+		node       = shared_ptr<Node>(new Node());
+        node->ptr  = new string(arg ? "true" : "false");
+        node->type = ValueType::BOOLEAN;
+	}
 
-    Index(const char* index) {
-        this->index = index;
-        // adiciono um prefixo e sufixo \"
-        this->index.insert(this->index.begin(), '"');
-        this->index.push_back('"');
+    // Essa versão do overload é também utilizada pra setar um índice que
+    // é usado na etapa de conversão JSON -> OBJECT
+    Index(const char* arg) {
+        this->index = arg;
+        node        = shared_ptr<Node>(new Node());
+        node->ptr   = new string(arg);
+        node->type  = ValueType::STRING;
     }
     
     string operator()() {
         return this->index;
     }
 
+    // Essa versão do overload é também utilizada pra setar um índice que
+    // é usado na etapa de conversão JSON -> OBJECT
+	Index(int32_t arg, int nullFlag = 0) {
+		this->index = to_string(arg);
+		node 	    = shared_ptr<Node>(new Node());
+        if(nullFlag) {
+		    node->ptr   = new string("null");
+		    node->type  = ValueType::NUL;
+        } else {
+            node->ptr   = new string(to_string(arg));
+		    node->type  = ValueType::NUMBER;
+        }
+	}
+
+	Index(double arg) {
+		node       = shared_ptr<Node>(new Node());
+		node->ptr  = new string(to_string(arg));
+		node->type = ValueType::NUMBER;
+	}
+
+	Index(shared_ptr<Node> node) {
+		this->node = node;
+	}
+
+	Index operator, (Index rhs) {
+		return *this;
+	}
+
+	shared_ptr<Node> getNode() const {
+		return this->node;
+	}
+
 private:
-    string index;
+	string 			 		 index;
+	shared_ptr<Node> 		 node;
 };
 
-string getValue(deque<Index> indexes, shared_ptr<Node> node) {
-    if(!indexes.empty()) {
-        Index index = indexes.front();
-        indexes.pop_front();
-        
+void parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
+void parserList(string& JSON, vector<shared_ptr<Node>>& list);
+
+class List {
+public:
+    vector<shared_ptr<Node>> array; 
+
+    Node* operator[](int32_t index) {
+        return array[index].get();
+    }
+
+    shared_ptr<Node> operator[](deque<Index> Index) {
+        shared_ptr<Node> node(new Node());
+        node->ptr  = new List();
+        node->type = ValueType::LIST;
+        for(auto e : Index) {
+            node->get<List>().array.push_back(e.getNode());
+        }
+
+        return node;
+    }
+};
+
+class KeyValue {
+public:
+    KeyValue(string key, Index value) : key(key), index(value) {
+    }
+
+    string getKey() const {
+        return key;
+    }
+
+    Index getVal() const {
+        return index;
+    }
+
+private:
+    string key;
+    Index index;
+};
+
+class Object {
+public:
+    map<string, shared_ptr<Node>> obj;
+
+    Node* operator[](string index) {
+        return this->obj[index].get();
+    }
+
+	shared_ptr<Node> operator()(deque<KeyValue> pairs) {
+        shared_ptr<Node> node(new Node());
+
+        node->type = ValueType::OBJECT;
+
+        node->ptr = new Object();
+
+        for(auto e : pairs) {
+            string key      = e.getKey();
+            auto   auxNode  = e.getVal().getNode();
+            node->get<Object>().obj[key] = auxNode;
+        }
+
+        return node;
+	}
+};
+
+class pathJSON {
+private:
+	class pathIndex {
+	public:
+		pathIndex(const char* index) {
+			this->index = index;
+		}
+
+		pathIndex(int index) {
+			this->index = to_string(index);
+		}
+
+		string getIndex() {
+        	return this->index;
+    	}
+	private:
+		string index;
+	};
+
+	deque<pathIndex> path;
+public:
+	pathJSON(deque<pathIndex> path) : path(path) {
+	}
+
+	string getIndex() {
+		string val = this->path.front().getIndex(); 
+		this->path.pop_front();
+		return val;
+	}
+
+	bool isEmpty() {
+		return this->path.empty();
+	}
+};
+
+string getValue(pathJSON path, shared_ptr<Node> node) {
+    if(!path.isEmpty()) {  
         if(node->type == ValueType::OBJECT) {
-            return getValue(indexes, shared_ptr<Node>(node->get<Object>()[index()]));
+            return getValue(path, shared_ptr<Node>(node->get<Object>()[path.getIndex()]));
         } else {
-            return getValue(indexes, shared_ptr<Node>(node->get<List>()[stoi(index())]));
+            return getValue(path, shared_ptr<Node>(node->get<List>()[stoi(path.getIndex())]));
         } 
     }
 
     return node->get<string>();
 }
 
-shared_ptr<Node> getNode(deque<Index> indexes, shared_ptr<Node> node) {
-    if(!indexes.empty()) {
-        Index index = indexes.front();
-        indexes.pop_front();
-
+shared_ptr<Node> getNode(pathJSON path, shared_ptr<Node> node) {
+    if(!path.isEmpty()) {
         if(node->type == ValueType::OBJECT) {
-            return getNode(indexes, shared_ptr<Node>(node->get<Object>()[index()]));
+            return getNode(path, shared_ptr<Node>(node->get<Object>()[path.getIndex()]));
         } else {
-            return getNode(indexes, shared_ptr<Node>(node->get<List>()[stoi(index())]));
+            return getNode(path, shared_ptr<Node>(node->get<List>()[stoi(path.getIndex())]));
         } 
     }
 
@@ -129,20 +242,20 @@ ValueType getTypeFromJSON(string& JSON) {
     return ValueType::NUMBER;
 }
 
-shared_ptr<Node> parseJSON(string& JSON) {
+shared_ptr<Node> JSONParse(string& JSON) {
     shared_ptr<Node> node(new Node());
 
     if(getTypeFromJSON(JSON) == ValueType::OBJECT) {
         node->ptr  = new Object();
         node->type = ValueType::OBJECT;  
-        parserObject(JSON, node->get<Object>().object);
+        parserObject(JSON, node->get<Object>().obj);
         return node;
     } 
 
     if(getTypeFromJSON(JSON) == ValueType::LIST) {
         node->ptr  = new List();
         node->type = ValueType::LIST;
-        parserList(JSON, node->get<List>().list);
+        parserList(JSON, node->get<List>().array);
         return node;
     }
 
@@ -269,7 +382,7 @@ void parserObject(string& JSON, map<string, shared_ptr<Node>>& object) {
     while(!JSON.empty()) {
         string key   = getKeyFromJSON(JSON);
         string value = getValueFromJSON(JSON);
-        object["\"" + key + "\""]  = parseJSON(value);
+        object[key]  = JSONParse(value);
         erasePrefixSeparators(JSON);
     }
 }
@@ -281,31 +394,101 @@ void parserList(string& JSON, vector<shared_ptr<Node>>& list) {
 
     while(!JSON.empty()) {
         string value = getValueFromJSON(JSON);
-        list.push_back(parseJSON(value));
+        list.push_back(JSONParse(value));
         erasePrefixSeparators(JSON);
     }
 }
 
-// apenas pra debugar
-string loadJSON() {
-    fstream fs("in", std::ifstream::in);
-    string temp, s;
+#define path        pathJSON
+#define list        List()
+#define object      Object()
+#define literal(a)  Index(a)
+#define number(a)   Index(a)
+#define null        Index(0, 1)
 
-    while(!fs.eof()) {
-        getline(fs, temp);
-        s.append(temp);
+string JSONStringify(shared_ptr<Node> node);
+
+string objectStrigify(shared_ptr<Node> node) {
+    string res;
+    res.push_back('{');
+
+    auto map = node->get<Object>().obj;
+
+    for(auto e : map) {
+        res.append('"' + e.first + "\": ");
+        res.append(JSONStringify(e.second));
+        res.push_back(',');
     }
 
-    return s;
+    if(res.back() == ',') {
+        res.pop_back();
+    }
+
+    return res + '}';
+}
+
+string listStringify(shared_ptr<Node> node) {
+    string res;
+
+    res.push_back('[');
+
+    auto arr = node->get<List>().array;
+
+    for(auto e : arr) {
+        res.append(JSONStringify(e));
+        res.push_back(',');
+    }
+
+    if(res.back() == ',') {
+        res.pop_back();
+    }
+
+    return res + ']';
+}
+
+string JSONStringify(shared_ptr<Node> node) {
+    if(node->type == ValueType::OBJECT) {
+        return objectStrigify(node);
+    }
+
+    if(node->type == ValueType::LIST) {
+        return listStringify(node);
+    }
+
+    if(node->type == ValueType::STRING) {
+        return "\"" + node->get<string>() + "\"";
+    }
+
+    if(node->type == ValueType::NUMBER) {
+        return node->get<string>();
+    }
+
+    if(node->type == ValueType::BOOLEAN) {
+        return node->get<string>();
+    }
+
+    if(node->type == ValueType::NUL) {
+        return node->get<string>();
+    }
+
+    return "";
 }
 
 int main() {
-    string s = loadJSON();
+    // string s = loadJSON();
 
-    shared_ptr<Node> node = parseJSON(s);
+    // shared_ptr<Node> node = JSONParse(s);
 
-    auto node1 = getNode({ "Pets", 2, 1, "Nome" }, node);
+    // auto node1 = getNode(path({"Age"}), node);
 
-    cout << getValue({ }, node1) << endl;
+    // cout << getValue(path({}), node1) << endl;
+
+    auto node = object({ {"name", "Derley"}, { "Algo", object({}) }});
+
+    string s = JSONStringify(node);
+
+    cout << s << endl;
+
+    //cout << JSONStringify(node) << endl;
     return 0;
 }

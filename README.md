@@ -1,5 +1,6 @@
 # CppJSONParser
 
+#### Suporte apenas pra UTF-8
 
 ### Exemplo 1: JSON para C++
 

@@ -10,7 +10,7 @@
 #include <memory>
 
 // JSON RFC --> https://www.rfc-editor.org/rfc/rfc8259
-// O coração do conversor é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
+// O coração do parser é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
 
 using namespace std;
 

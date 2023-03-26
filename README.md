@@ -45,7 +45,7 @@ int main() {
     
     cout << val << endl;
   
-    // Nós intermediários são úteis quando possuem muitos caminhos, pois poderam levar a diferentes folhas posteriormente
+    // Nós intermediários são úteis quando possuem muitos caminhos, pois podem levar a diferentes folhas posteriormente
     return 0;
 }
 ```

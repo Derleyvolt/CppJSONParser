@@ -2,8 +2,6 @@
 
 ### [JSON RFC](https://www.rfc-editor.org/rfc/rfc8259)
 
-#### Suporte apenas pra caracteres ASCII.. Suporte para UTF-8 em andamento
-
 ### Exemplo 1: JSON para C++
 
 ```cpp

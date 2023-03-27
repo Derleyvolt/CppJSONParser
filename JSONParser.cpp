@@ -1,164 +1,99 @@
-#include <iostream>
-#include <vector>
-#include <map>
-#include <string.h>
-#include <string>
-#include <algorithm>
-#include <stack>
-#include <fstream>
-#include <deque>
-#include <memory>
-
-// JSON RFC --> https://www.rfc-editor.org/rfc/rfc8259
-// O coração do parser é tranformar o JSON em uma árvore N-ária e a partir dai ir extraindo os dados..
+#include "A.hpp"
 
 using namespace std;
 
-enum ValueType {
-    OBJECT,
-    LIST,
-    STRING,
-    BOOLEAN,
-    NUMBER,
-    NUL
-};
+Index::Index(bool arg) {
+    node       = shared_ptr<Node>(new Node());
+    node->ptr  = new string(arg ? "true" : "false");
+    node->type = ValueType::BOOLEAN;
+}
 
-struct Node {
-    void* ptr = nullptr;
+Index::Index(const char* arg) {
+    this->index = arg;
+    node        = shared_ptr<Node>(new Node());
+    node->ptr   = new string(arg);
+    node->type  = ValueType::STRING;
+}
 
-    template<typename T>
-    T& get() {
-        return *(T*)ptr;
+string Index::operator()() {
+    return this->index;
+}
+
+Index::Index(int32_t arg, int nullFlag) {
+    this->index = to_string(arg);
+    node 	    = shared_ptr<Node>(new Node());
+    if(nullFlag) {
+        node->ptr   = new string("null");
+        node->type  = ValueType::NUL;
+    } else {
+        node->ptr   = new string(to_string(arg));
+        node->type  = ValueType::NUMBER;
+    }
+}
+
+Index::Index(double arg) {
+    node       = shared_ptr<Node>(new Node());
+    node->ptr  = new string(to_string(arg));
+    node->type = ValueType::NUMBER;
+}
+
+Index::Index(shared_ptr<Node> node) {
+    this->node = node;
+}
+
+Index Index::operator, (Index rhs) {
+    return *this;
+}
+
+shared_ptr<Node> Index::getNode() const {
+    return this->node;
+}
+
+Node* List::operator[](int32_t index) {
+    return array[index].get();
+}
+
+shared_ptr<Node> List::operator[](deque<Index> Index) {
+    shared_ptr<Node> node(new Node());
+    node->ptr  = new List();
+    node->type = ValueType::LIST;
+    for(auto e : Index) {
+        node->get<List>().array.push_back(e.getNode());
     }
 
-    ~Node();
+    return node;
+}
 
-    ValueType type;
-};
+KeyValue::KeyValue(string key, Index value) : key(key), index(value) {
+}
 
-class Index {
-public:
-	Index(bool arg) {
-		node       = shared_ptr<Node>(new Node());
-        node->ptr  = new string(arg ? "true" : "false");
-        node->type = ValueType::BOOLEAN;
-	}
+string KeyValue::getKey() const {
+    return key;
+}
 
-    // Essa versão do overload é também utilizada pra setar um índice que
-    // é usado na etapa de conversão JSON -> OBJECT
-    Index(const char* arg) {
-        this->index = arg;
-        node        = shared_ptr<Node>(new Node());
-        node->ptr   = new string(arg);
-        node->type  = ValueType::STRING;
-    }
-    
-    string operator()() {
-        return this->index;
-    }
+Index KeyValue::getVal() const {
+    return index;
+}
 
-    // Essa versão do overload é também utilizada pra setar um índice que
-    // é usado na etapa de conversão JSON -> OBJECT
-	Index(int32_t arg, int nullFlag = 0) {
-		this->index = to_string(arg);
-		node 	    = shared_ptr<Node>(new Node());
-        if(nullFlag) {
-		    node->ptr   = new string("null");
-		    node->type  = ValueType::NUL;
-        } else {
-            node->ptr   = new string(to_string(arg));
-		    node->type  = ValueType::NUMBER;
-        }
-	}
+Node* Object::operator[](string index) {
+    return this->obj[index].get();
+}
 
-	Index(double arg) {
-		node       = shared_ptr<Node>(new Node());
-		node->ptr  = new string(to_string(arg));
-		node->type = ValueType::NUMBER;
-	}
+shared_ptr<Node> Object::operator()(deque<KeyValue> pairs) {
+    shared_ptr<Node> node(new Node());
 
-	Index(shared_ptr<Node> node) {
-		this->node = node;
-	}
+    node->type = ValueType::OBJECT;
 
-	Index operator, (Index rhs) {
-		return *this;
-	}
+    node->ptr = new Object();
 
-	shared_ptr<Node> getNode() const {
-		return this->node;
-	}
-
-private:
-	string 			 		 index;
-	shared_ptr<Node> 		 node;
-};
-
-void parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
-void parserList(string& JSON, vector<shared_ptr<Node>>& list);
-
-class List {
-public:
-    vector<shared_ptr<Node>> array; 
-
-    Node* operator[](int32_t index) {
-        return array[index].get();
+    for(auto e : pairs) {
+        string key      = e.getKey();
+        auto   auxNode  = e.getVal().getNode();
+        node->get<Object>().obj[key] = auxNode;
     }
 
-    shared_ptr<Node> operator[](deque<Index> Index) {
-        shared_ptr<Node> node(new Node());
-        node->ptr  = new List();
-        node->type = ValueType::LIST;
-        for(auto e : Index) {
-            node->get<List>().array.push_back(e.getNode());
-        }
-
-        return node;
-    }
-};
-
-class KeyValue {
-public:
-    KeyValue(string key, Index value) : key(key), index(value) {
-    }
-
-    string getKey() const {
-        return key;
-    }
-
-    Index getVal() const {
-        return index;
-    }
-
-private:
-    string key;
-    Index index;
-};
-
-class Object {
-public:
-    map<string, shared_ptr<Node>> obj;
-
-    Node* operator[](string index) {
-        return this->obj[index].get();
-    }
-
-	shared_ptr<Node> operator()(deque<KeyValue> pairs) {
-        shared_ptr<Node> node(new Node());
-
-        node->type = ValueType::OBJECT;
-
-        node->ptr = new Object();
-
-        for(auto e : pairs) {
-            string key      = e.getKey();
-            auto   auxNode  = e.getVal().getNode();
-            node->get<Object>().obj[key] = auxNode;
-        }
-
-        return node;
-	}
-};
+    return node;
+}
 
 // evitando memory leak
 Node::~Node() {
@@ -173,40 +108,18 @@ Node::~Node() {
     }
 }
 
-class pathJSON {
-private:
-	class pathIndex {
-	public:
-		pathIndex(const char* index) {
-			this->index = index;
-		}
+pathJSON::pathJSON(deque<pathIndex> path) : pathTree(path) {
+}
 
-		pathIndex(int index) {
-			this->index = to_string(index);
-		}
+string pathJSON::getIndex() {
+    string val = this->pathTree.front().getIndex(); 
+    this->pathTree.pop_front();
+    return val;
+}
 
-		string getIndex() {
-        	return this->index;
-    	}
-	private:
-		string index;
-	};
-
-	deque<pathIndex> path;
-public:
-	pathJSON(deque<pathIndex> path) : path(path) {
-	}
-
-	string getIndex() {
-		string val = this->path.front().getIndex(); 
-		this->path.pop_front();
-		return val;
-	}
-
-	bool isEmpty() {
-		return this->path.empty();
-	}
-};
+bool pathJSON::isEmpty() {
+    return this->pathTree.empty();
+}
 
 string getValue(pathJSON path, Node* node) {
     if(!path.isEmpty()) {  
@@ -220,8 +133,6 @@ string getValue(pathJSON path, Node* node) {
     return node->get<string>();
 }
 
-// Way Down We Go.
-
 Node* getNode(pathJSON path, Node* node) {
     if(!path.isEmpty()) {
         if(node->type == ValueType::OBJECT) {
@@ -234,7 +145,6 @@ Node* getNode(pathJSON path, Node* node) {
     return node;
 }
 
-// partido da assumição de que o JSON é sempre válido
 ValueType getTypeFromJSON(string& JSON) {
     if(JSON.front() == '[') {
         return ValueType::LIST;
@@ -300,8 +210,6 @@ shared_ptr<Node> JSONParse(string& JSON) {
     return node;
 }
 
-// https://www.rfc-editor.org/rfc/rfc8259#page-5
-// JSON Lista de simbolos que podem ser ignorados
 bool skipSymbols(char c) {
     return c == ',' ? 1 : c == ' ' ? 1 : c == ':' ? 1 : c == 0xA ? 1 : c == 0x9 ? 1 : c == 0xD ? 1 : 0;
 }
@@ -317,7 +225,6 @@ void erasePrefixSeparators(string& JSON) {
     JSON.clear();
 }   
 
-// espera apenas espaços
 string getKeyFromJSON(string& JSON) {
     erasePrefixSeparators(JSON);
 
@@ -326,7 +233,6 @@ string getKeyFromJSON(string& JSON) {
     return value;
 }
 
-// espera apenas espaços ou vírgulas precedendo o value
 string getValueFromJSON(string& JSON) {
     stack<char> aux;
     string value;
@@ -390,7 +296,7 @@ string getValueFromJSON(string& JSON) {
     }
 }
 
-void parserObject(string& JSON, map<string, shared_ptr<Node>>& object) {
+void parserObject(string& JSON, map<string, shared_ptr<Node>>& obj) {
     int JSONLen = JSON.size();
 
     // apaga as chaves do objeto
@@ -399,29 +305,22 @@ void parserObject(string& JSON, map<string, shared_ptr<Node>>& object) {
     while(!JSON.empty()) {
         string key   = getKeyFromJSON(JSON);
         string value = getValueFromJSON(JSON);
-        object[key]  = JSONParse(value);
+        obj[key]     = JSONParse(value);
         erasePrefixSeparators(JSON);
     }
 }
 
-void parserList(string& JSON, vector<shared_ptr<Node>>& list) {
+void parserList(string& JSON, vector<shared_ptr<Node>>& ls) {
     int JSONLen = JSON.size();
 
     JSON = JSON.substr(1, JSONLen-2);
 
     while(!JSON.empty()) {
         string value = getValueFromJSON(JSON);
-        list.push_back(JSONParse(value));
+        ls.push_back(JSONParse(value));
         erasePrefixSeparators(JSON);
     }
 }
-
-#define path        pathJSON
-#define list        List()
-#define object      Object()
-#define literal(a)  Index(a)
-#define number(a)   Index(a)
-#define null        Index(0, 1)
 
 string JSONStringify(shared_ptr<Node> node);
 
@@ -489,8 +388,4 @@ string JSONStringify(shared_ptr<Node> node) {
     }
 
     return "";
-}
-
-int main() {
-    return 0;
 }

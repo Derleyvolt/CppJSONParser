@@ -147,10 +147,6 @@ string getKeyFromJSON(string& JSON);
 // espera apenas espaços ou vírgulas precedendo o value
 string getValueFromJSON(string& JSON);
 
-void parserObject(string& JSON, map<string, shared_ptr<Node>>& object);
-
-void parserList(string& JSON, vector<shared_ptr<Node>>& list);
-
 #define path        pathJSON
 #define list        List()
 #define object      Object()
